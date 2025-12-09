@@ -1,4 +1,4 @@
-package com.vediochat.SignalingServer;
+package com.videochat.SignalingServer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

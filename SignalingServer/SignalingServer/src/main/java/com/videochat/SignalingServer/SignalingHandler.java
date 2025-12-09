@@ -1,4 +1,4 @@
-package com.vediochat.SignalingServer;
+package com.videochat.SignalingServer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,41 +26,49 @@ public class SignalingHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        System.out.println("WebSocket closed: " + session.getId());
+        System.out.println("WebSocket closed: " + session.getId() + " Status: " + status);
         waitingQueue.remove(session);
 
-        // remove from peerMap and notify peer if exists
+        // Remove from peerMap and notify peer if exists
         WebSocketSession peer = peerMap.remove(session.getId());
         if (peer != null && peer.isOpen()) {
             peerMap.remove(peer.getId());
             try {
                 peer.sendMessage(new TextMessage("{\"type\":\"peerDisconnected\"}"));
+                System.out.println("Notified peer " + peer.getId() + " about disconnection");
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Error notifying peer about disconnection: " + e.getMessage());
             }
         }
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
-        JsonNode jsonMessage = objectMapper.readTree(message.getPayload());
-        String type = jsonMessage.get("type").asText();
+        try {
+            JsonNode jsonMessage = objectMapper.readTree(message.getPayload());
+            String type = jsonMessage.has("type") ? jsonMessage.get("type").asText() : "unknown";
 
-        switch (type) {
-            case "ready":
-                handleReady(session);
-                break;
-            case "offer":
-                handleOffer(session, jsonMessage);
-                break;
-            case "answer":
-                handleAnswer(session, jsonMessage);
-                break;
-            case "iceCandidate":
-                handleIceCandidate(session, jsonMessage);
-                break;
-            default:
-                System.out.println("Unknown message type: " + type);
+            System.out.println("Received message from " + session.getId() + ": " + type);
+
+            switch (type) {
+                case "ready":
+                    handleReady(session);
+                    break;
+                case "offer":
+                    handleOffer(session, jsonMessage);
+                    break;
+                case "answer":
+                    handleAnswer(session, jsonMessage);
+                    break;
+                case "iceCandidate":
+                    handleIceCandidate(session, jsonMessage);
+                    break;
+                default:
+                    System.out.println("Unknown message type: " + type);
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling message from " + session.getId() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -69,19 +77,29 @@ public class SignalingHandler extends TextWebSocketHandler {
 
         if (!waitingQueue.isEmpty()) {
             WebSocketSession peer = waitingQueue.poll();
-            if (peer != null && peer.isOpen() && peer.getId() != session.getId()) {
+            
+            // Fixed: Use .equals() for String comparison instead of !=
+            if (peer != null && peer.isOpen() && !peer.getId().equals(session.getId())) {
                 peerMap.put(session.getId(), peer);
                 peerMap.put(peer.getId(), session);
 
                 System.out.println("Match found! " + session.getId() + " paired with " + peer.getId());
 
                 // Tell each client who their peer is
-                peer.sendMessage(new TextMessage("{\"type\":\"matchFound\",\"peerId\":\"" + session.getId() + "\",\"ownId\":\"" + peer.getId() + "\"}"));
-                session.sendMessage(new TextMessage("{\"type\":\"matchFound\",\"peerId\":\"" + peer.getId() + "\",\"ownId\":\"" + session.getId() + "\"}"));
+                String peerMessage = "{\"type\":\"matchFound\",\"peerId\":\"" + session.getId() + "\",\"ownId\":\"" + peer.getId() + "\"}";
+                String sessionMessage = "{\"type\":\"matchFound\",\"peerId\":\"" + peer.getId() + "\",\"ownId\":\"" + session.getId() + "\"}";
+                
+                peer.sendMessage(new TextMessage(peerMessage));
+                session.sendMessage(new TextMessage(sessionMessage));
+                
+                System.out.println("Sent matchFound to both peers");
             } else {
+                // Peer is invalid, add current session to queue
+                System.out.println("Invalid peer found in queue, adding current session to queue");
                 waitingQueue.add(session);
             }
         } else {
+            System.out.println("No peers waiting, adding " + session.getId() + " to queue");
             waitingQueue.add(session);
         }
     }
@@ -89,13 +107,16 @@ public class SignalingHandler extends TextWebSocketHandler {
     private void handleOffer(WebSocketSession session, JsonNode message) throws IOException {
         JsonNode peerIdNode = message.get("peerId");
         if (peerIdNode == null) {
-            System.out.println("Offer message missing peerId: " + message.toString());
+            System.out.println("Offer message missing peerId from " + session.getId());
             return;
         }
+        
         String peerId = peerIdNode.asText();
         WebSocketSession peer = peerMap.get(peerId);
+        
         if (peer != null && peer.isOpen()) {
             peer.sendMessage(new TextMessage(message.toString()));
+            System.out.println("Forwarded offer from " + session.getId() + " to " + peerId);
         } else {
             System.out.println("Peer not found or not open for offer: " + peerId);
         }
@@ -104,26 +125,36 @@ public class SignalingHandler extends TextWebSocketHandler {
     private void handleAnswer(WebSocketSession session, JsonNode message) throws IOException {
         JsonNode peerIdNode = message.get("peerId");
         if (peerIdNode == null) {
-            System.out.println("Answer message missing peerId: " + message.toString());
+            System.out.println("Answer message missing peerId from " + session.getId());
             return;
         }
+        
         String peerId = peerIdNode.asText();
         WebSocketSession peer = peerMap.get(peerId);
+        
         if (peer != null && peer.isOpen()) {
             peer.sendMessage(new TextMessage(message.toString()));
+            System.out.println("Forwarded answer from " + session.getId() + " to " + peerId);
+        } else {
+            System.out.println("Peer not found or not open for answer: " + peerId);
         }
     }
 
     private void handleIceCandidate(WebSocketSession session, JsonNode message) throws IOException {
         JsonNode peerIdNode = message.get("peerId");
         if (peerIdNode == null) {
-            System.out.println("ICE candidate message missing peerId: " + message.toString());
+            System.out.println("ICE candidate message missing peerId from " + session.getId());
             return;
         }
+        
         String peerId = peerIdNode.asText();
         WebSocketSession peer = peerMap.get(peerId);
+        
         if (peer != null && peer.isOpen()) {
             peer.sendMessage(new TextMessage(message.toString()));
+            System.out.println("Forwarded ICE candidate from " + session.getId() + " to " + peerId);
+        } else {
+            System.out.println("Peer not found or not open for ICE candidate: " + peerId);
         }
     }
 }
