@@ -32,23 +32,97 @@ A real-time peer-to-peer video chat application built with WebRTC, Spring Boot W
 ## 🏗️ Architecture
 
 ```
-┌─────────────┐         WebSocket          ┌─────────────────┐
-│   Client A  │◄──────Signaling───────────►│  Spring Boot    │
-│  (Browser)  │      (Offer/Answer/ICE)    │  Signaling      │
-└─────────────┘                             │  Server         │
-      ▲                                     └─────────────────┘
-      │                                              ▲
-      │                                              │
-      │         WebRTC (Direct P2P)                 │
-      │         (Video/Audio Stream)                │
-      │                                              │
-      ▼                                              ▼
-┌─────────────┐         WebSocket          ┌─────────────────┐
-│   Client B  │◄──────Signaling───────────►│                 │
-│  (Browser)  │      (Offer/Answer/ICE)    │                 │
-└─────────────┘                             └─────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        Client Layer                          │
+│  ┌──────────────┐                    ┌──────────────┐       │
+│  │   Browser A  │                    │   Browser B  │       │
+│  │  (Client 1)  │                    │  (Client 2)  │       │
+│  └──────────────┘                    └──────────────┘       │
+│         │                                    │               │
+│         │ WebSocket (Signaling)              │               │
+│         │                                    │               │
+└─────────┼────────────────────────────────────┼───────────────┘
+          │                                    │
+          ▼                                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Signaling Server                        │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │         Spring Boot WebSocket Server                 │   │
+│  │  • SignalingHandler (Message Router)                 │   │
+│  │  • Waiting Queue (Peer Matching)                     │   │
+│  │  • Peer Map (Active Connections)                     │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+          │                                    │
+          │                                    │
+          └────────────┬───────────────────────┘
+                       │
+                       ▼
+          ┌─────────────────────────┐
+          │    WebRTC P2P Layer     │
+          │  (Direct Connection)    │
+          │  • Video Stream         │
+          │  • Audio Stream         │
+          │  • ICE Candidates       │
+          └─────────────────────────┘
+                       │
+                       ▼
+          ┌─────────────────────────┐
+          │    STUN Servers         │
+          │  (NAT Traversal)        │
+          │  • Google STUN (5x)     │
+          └─────────────────────────┘
 ```
-
+## Component Interaction
+'''
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│ Home.html│────▶│ main.js  │────▶│webrtc.js │────▶│ Browser  │
+└──────────┘     └──────────┘     └──────────┘     │ WebRTC   │
+                       │                            │   API    │
+                       ▼                            └──────────┘
+                 ┌──────────┐                             │
+                 │signaling.│                             │
+                 │   js     │                             │
+                 └──────────┘                             │
+                       │                                  │
+                       ▼                                  │
+                 ┌──────────┐                             │
+                 │WebSocket │◀────────────────────────────┘
+                 │ Server   │         ICE Candidates
+                 └──────────┘         & Media Negotiation
+'''
+## State Transistion
+'''
+Application States:
+┌──────────────┐
+│ Initialized  │
+└──────┬───────┘
+       │ setup()
+       ▼
+┌──────────────┐
+│   Ready      │ (Button enabled)
+└──────┬───────┘
+       │ findMatch()
+       ▼
+┌──────────────┐
+│   Waiting    │ (In queue)
+└──────┬───────┘
+       │ matchFound
+       ▼
+┌──────────────┐
+│  Connecting  │ (WebRTC negotiation)
+└──────┬───────┘
+       │ ICE connected
+       ▼
+┌──────────────┐
+│  Connected   │ (Streaming)
+└──────┬───────┘
+       │ peerDisconnected
+       ▼
+┌──────────────┐
+│ Disconnected │
+└──────────────┘
+'''git
 ## 📦 Prerequisites
 
 Before you begin, ensure you have the following installed:
