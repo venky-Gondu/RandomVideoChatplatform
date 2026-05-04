@@ -9,7 +9,7 @@ const RECONNECT_DELAY = 3000;
  * @param {Function} onMessageReceived - Callback function to handle received messages
  * @returns {WebSocket} The WebSocket connection
  */
-export function connectToSignalingServer(onMessageReceived) {
+export function   connectToSignalingServer(onMessageReceived) {
 
     const wsUrl = 'wss://5655b3ccc1dc.ngrok-free.app/websocket-endpoint';
     
