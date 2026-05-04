@@ -74,7 +74,7 @@ A real-time peer-to-peer video chat application built with WebRTC, Spring Boot W
           └─────────────────────────┘
 ```
 ## Component Interaction
-'''
+```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
 │ Home.html│────▶│ main.js  │────▶│webrtc.js │────▶│ Browser  │
 └──────────┘     └──────────┘     └──────────┘     │ WebRTC   │
@@ -90,9 +90,9 @@ A real-time peer-to-peer video chat application built with WebRTC, Spring Boot W
                  │WebSocket │◀────────────────────────────┘
                  │ Server   │         ICE Candidates
                  └──────────┘         & Media Negotiation
-'''
+```
 ## State Transistion
-'''
+```
 Application States:
 ┌──────────────┐
 │ Initialized  │
@@ -122,7 +122,7 @@ Application States:
 ┌──────────────┐
 │ Disconnected │
 └──────────────┘
-'''git
+```
 ## 📦 Prerequisites
 
 Before you begin, ensure you have the following installed:
